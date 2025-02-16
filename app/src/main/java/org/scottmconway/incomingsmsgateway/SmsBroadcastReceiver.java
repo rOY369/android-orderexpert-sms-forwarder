@@ -1,11 +1,17 @@
 package org.scottmconway.incomingsmsgateway;
 
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.telephony.SmsMessage;
 
+import androidx.core.content.ContextCompat;
 import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
 import androidx.work.Data;
@@ -21,6 +27,20 @@ import java.util.concurrent.TimeUnit;
 public class SmsBroadcastReceiver extends BroadcastReceiver {
 
     private Context context;
+
+    private String getContactNameByPhoneNumber(String phoneNumber, Context context) {
+        ContentResolver contentResolver = context.getContentResolver();
+        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
+        String[] projection = {ContactsContract.PhoneLookup.DISPLAY_NAME};
+        String contactName = null;
+        Cursor cursor = contentResolver.query(uri, projection, null, null, null);
+        if (cursor != null && cursor.moveToFirst()) {
+            int nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME);
+            contactName = cursor.getString(nameIndex);
+            cursor.close();
+        }
+        return contactName;
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -46,13 +66,29 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
         ArrayList<ForwardingConfig> configs = ForwardingConfig.getAll(context);
         String asterisk = context.getString(R.string.asterisk);
 
-        String sender = messages[0].getOriginatingAddress();
-        if (sender == null) {
+        String senderPhoneNumber = messages[0].getOriginatingAddress();
+        if (senderPhoneNumber == null) {
             return;
         }
 
+        // get sender's contact name if applicable
+        String senderName = null;
+        // Attempt to resolve sender name if `READ_CONTACTS` permission has been granted
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                senderName = getContactNameByPhoneNumber(senderPhoneNumber, context);
+            }
+            catch (java.lang.SecurityException se) {
+                // READ_CONTACTS hasn't been granted, but we shouldn't've gotten here...
+                assert true;
+            }
+        }
+        if (senderName == null) {
+            senderName = senderPhoneNumber;     // fallback to phone number
+        }
+
         for (ForwardingConfig config : configs) {
-            if (!sender.equals(config.getSender()) && !config.getSender().equals(asterisk)) {
+            if (!senderPhoneNumber.equals(config.getSender()) && !config.getSender().equals(asterisk)) {
                 continue;
             }
 
@@ -74,14 +110,14 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
                 slotName = "sim" + slotId;
             }
 
-            this.callWebHook(config, sender, slotName, content.toString(), messages[0].getTimestampMillis());
+            this.callWebHook(config, senderPhoneNumber, senderName, slotName, content.toString(), messages[0].getTimestampMillis());
         }
     }
 
-    protected void callWebHook(ForwardingConfig config, String sender, String slotName,
+    protected void callWebHook(ForwardingConfig config, String senderPhoneNumber, String senderName, String slotName,
                                String content, long timeStamp) {
 
-        String message = config.prepareMessage(sender, content, slotName, timeStamp);
+        String message = config.prepareMessage(senderPhoneNumber, senderName, content, slotName, timeStamp);
 
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)

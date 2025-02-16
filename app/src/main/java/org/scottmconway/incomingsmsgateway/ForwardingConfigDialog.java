@@ -251,7 +251,7 @@ public class ForwardingConfigDialog {
 
         Thread thread = new Thread(() -> {
             String payload = config.prepareMessage(
-                    "123456789", "test message", "sim1", System.currentTimeMillis());
+                    "123456789", "contact name", "test message", "sim1", System.currentTimeMillis());
             Request request = new Request(config.getUrl(), payload);
             request.setJsonHeaders(config.getHeaders());
             request.setIgnoreSsl(config.getIgnoreSsl());
