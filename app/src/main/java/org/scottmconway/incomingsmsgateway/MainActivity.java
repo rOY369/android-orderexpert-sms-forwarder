@@ -42,8 +42,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-            // Only request `READ_CONTACTS` when requesting `RECEIVE_SMS`, as we can run without it
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_CONTACTS}, PERMISSION_CODE);
+            // we can run with any subset of these permissions,
+            // but functionality will be limited
+            ActivityCompat.requestPermissions(this, new String[]{
+                    Manifest.permission.RECEIVE_SMS,
+                    Manifest.permission.READ_CONTACTS,
+                    Manifest.permission.READ_PHONE_STATE,
+                    Manifest.permission.READ_CALL_LOG
+            }, PERMISSION_CODE);
         } else {
             showList();
         }

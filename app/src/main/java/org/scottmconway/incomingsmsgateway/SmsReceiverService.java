@@ -10,6 +10,7 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Telephony;
+import android.telephony.TelephonyManager;
 
 import androidx.annotation.Nullable;
 
@@ -30,8 +31,11 @@ public class SmsReceiverService extends Service {
         IntentFilter filter = new IntentFilter();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             filter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
+            filter.addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
+
         } else {
             filter.addAction("android.provider.Telephony.SMS_RECEIVED");
+            filter.addAction("android.provider.TelephonyManager.ACTION_PHONE_STATE_CHANGED");
         }
 
         registerReceiver(receiver, filter);
