@@ -123,7 +123,7 @@ public class ForwardingConfig {
     }
 
     public static String getDefaultJsonTemplate() {
-        return "{\n  \"from\":\"%from%\",\n  \"text\":\"%text%\",\n  \"sentStamp\":%sentStamp%,\n  \"receivedStamp\":%receivedStamp%,\n  \"sim\":\"%sim%\"\n}";
+        return "{\n  \"from\":\"%fromName%\",\n  \"text\":\"%text%\",\n  \"sentStamp\":%sentStamp%,\n  \"receivedStamp\":%receivedStamp%,\n  \"sim\":\"%sim%\"\n}";
     }
 
     public static String getDefaultJsonHeaders() {
@@ -235,9 +235,10 @@ public class ForwardingConfig {
         editor.commit();
     }
 
-    public String prepareMessage(String from, String content, String sim, long timeStamp) {
+    public String prepareMessage(String from, String fromName, String content, String sim, long timeStamp) {
         return this.getTemplate()
                 .replaceAll("%from%", from)
+                .replaceAll("%fromName%", fromName)
                 .replaceAll("%sentStamp%", String.valueOf(timeStamp))
                 .replaceAll("%receivedStamp%", String.valueOf(System.currentTimeMillis()))
                 .replaceAll("%sim%", sim)
