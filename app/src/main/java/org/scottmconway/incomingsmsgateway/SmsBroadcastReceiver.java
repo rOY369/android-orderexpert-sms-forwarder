@@ -1,4 +1,4 @@
-package tech.bogomolov.incomingsmsgateway;
+package org.scottmconway.incomingsmsgateway;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

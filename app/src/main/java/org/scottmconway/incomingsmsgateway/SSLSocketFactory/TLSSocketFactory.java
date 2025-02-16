@@ -1,4 +1,4 @@
-package tech.bogomolov.incomingsmsgateway.SSLSocketFactory;
+package org.scottmconway.incomingsmsgateway.SSLSocketFactory;
 
 import android.annotation.SuppressLint;
 import android.net.SSLCertificateSocketFactory;

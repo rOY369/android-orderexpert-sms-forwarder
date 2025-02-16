@@ -1,4 +1,4 @@
-package tech.bogomolov.incomingsmsgateway;
+package org.scottmconway.incomingsmsgateway;
 
 import android.Manifest;
 import android.app.ActivityManager;
@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String[] command = new String[]{
                         "logcat", "-d", "*:E", "-m", "1000",
-                        "|", "grep", "tech.bogomolov.incomingsmsgateway"};
+                        "|", "grep", "org.scottmconway.incomingsmsgateway"};
                 Process process = Runtime.getRuntime().exec(command);
 
                 BufferedReader bufferedReader = new BufferedReader(
@@ -151,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean isServiceRunning() {
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-            if (tech.bogomolov.incomingsmsgateway.SmsReceiverService.class.getName().equals(service.service.getClassName())) {
+            if (org.scottmconway.incomingsmsgateway.SmsReceiverService.class.getName().equals(service.service.getClassName())) {
                 return true;
             }
         }

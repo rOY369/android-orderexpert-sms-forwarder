@@ -1,4 +1,4 @@
-package tech.bogomolov.incomingsmsgateway;
+package org.scottmconway.incomingsmsgateway;
 
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;

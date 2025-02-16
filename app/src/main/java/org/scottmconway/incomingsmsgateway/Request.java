@@ -1,4 +1,4 @@
-package tech.bogomolov.incomingsmsgateway;
+package org.scottmconway.incomingsmsgateway;
 
 import android.annotation.SuppressLint;
 import android.util.Log;
@@ -23,7 +23,7 @@ import java.util.Iterator;
 
 import javax.net.ssl.HttpsURLConnection;
 
-import tech.bogomolov.incomingsmsgateway.SSLSocketFactory.TLSSocketFactory;
+import org.scottmconway.incomingsmsgateway.SSLSocketFactory.TLSSocketFactory;
 
 public class Request {
 

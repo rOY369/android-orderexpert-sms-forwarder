@@ -5,7 +5,7 @@ android {
     buildToolsVersion "30.0.3"
 
     defaultConfig {
-        applicationId "tech.bogomolov.incomingsmsgateway"
+        applicationId "org.scottmconway.incomingsmsgateway"
         minSdkVersion 14
         targetSdkVersion 33
         versionCode 12
