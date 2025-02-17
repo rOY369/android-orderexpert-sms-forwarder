@@ -78,12 +78,16 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             }
 
             // call webhook if all above criteria met
-            this.callWebHook(config, message.senderPhoneNumber, message.senderName, message.simSlotName, message.messageContent, message.timestamp);
+            this.callWebHook(config, message);
         }
     }
 
     public WebhookMessage onReceivePhoneStateChange(Context context, Intent intent) {
         Bundle bundle = intent.getExtras();
+
+        // TODO reference locale instead
+        String messageSource = "Incoming Call";
+
 
         // get caller number
         // When the phone is ringing, read the incoming number
@@ -104,11 +108,6 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
         // get caller's contact name if applicable
         String senderName = getContactNameByPhoneNumber(callerPhoneNumber, context);
 
-        // TODO set message text
-        // TODO "Incoming Call" should reference locales!
-        // TODO consider adding a field in the JSON template to indicate the kind of message -
-        // how would this differ from an SMS w/ the text "Incoming Call"?
-
         // get SIM slot info
         int slotId = this.detectSim(bundle) + 1;
         String slotName = "undetected";
@@ -120,13 +119,16 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             slotName = "sim" + slotId;
         }
 
-        return new WebhookMessage(callerPhoneNumber, senderName, slotId, slotName, "Incoming Call",  System.currentTimeMillis());
+        return new WebhookMessage(messageSource, callerPhoneNumber, senderName, slotId, slotName, "",  System.currentTimeMillis());
     }
 
     public WebhookMessage onReceiveSmsReceived(Context context, Intent intent) {
 
         // construct SMS message
         Bundle bundle = intent.getExtras();
+
+        // TODO reference locale instead
+        String messageSource = "Incoming SMS";
 
         Object[] pdus = (Object[]) bundle.get("pdus");
         if (pdus == null || pdus.length == 0) {
@@ -160,13 +162,12 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
                 slotName = "sim" + slotId;
             }
 
-        return new WebhookMessage(senderPhoneNumber, senderName, slotId, slotName, content.toString(), messages[0].getTimestampMillis());
+        return new WebhookMessage(messageSource, senderPhoneNumber, senderName, slotId, slotName, content.toString(), messages[0].getTimestampMillis());
     }
 
-    public void callWebHook(ForwardingConfig config, String senderPhoneNumber, String senderName, String slotName,
-                               String content, long timeStamp) {
+    public void callWebHook(ForwardingConfig config,WebhookMessage message) {
 
-        String message = config.prepareMessage(senderPhoneNumber, senderName, content, slotName, timeStamp);
+        String strMessage = config.prepareMessage(message);
 
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -174,7 +175,7 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
 
         Data data = new Data.Builder()
                 .putString(RequestWorker.DATA_URL, config.getUrl())
-                .putString(RequestWorker.DATA_TEXT, message)
+                .putString(RequestWorker.DATA_TEXT, strMessage)
                 .putString(RequestWorker.DATA_HEADERS, config.getHeaders())
                 .putBoolean(RequestWorker.DATA_IGNORE_SSL, config.getIgnoreSsl())
                 .putBoolean(RequestWorker.DATA_CHUNKED_MODE, config.getChunkedMode())

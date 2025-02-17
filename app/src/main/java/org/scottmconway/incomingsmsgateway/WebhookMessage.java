@@ -1,6 +1,7 @@
 package org.scottmconway.incomingsmsgateway;
 
 public class WebhookMessage {
+    public String messageType;
     public String senderPhoneNumber;
     public String senderName;
     public int simSlotId;
@@ -10,7 +11,8 @@ public class WebhookMessage {
 
 
     // Parameterized constructor
-    public WebhookMessage(String senderPhoneNumber, String senderName, int simSlotId, String simSlotName, String messageContent, long timestamp) {
+    public WebhookMessage(String messageType, String senderPhoneNumber, String senderName, int simSlotId, String simSlotName, String messageContent, long timestamp) {
+        this.messageType = messageType;
         this.senderName = senderName;
         this.simSlotId = simSlotId;
         this.simSlotName = simSlotName;
