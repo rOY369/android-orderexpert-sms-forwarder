@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.telephony.SmsMessage;
+import android.telephony.TelephonyManager;
 
 import androidx.core.content.ContextCompat;
 import androidx.work.BackoffPolicy;
@@ -20,6 +21,8 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.WorkRequest;
 
+import android.util.Log;
+import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -28,32 +31,108 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
 
     private Context context;
 
-    private String getContactNameByPhoneNumber(String phoneNumber, Context context) {
-        ContentResolver contentResolver = context.getContentResolver();
-        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
-        String[] projection = {ContactsContract.PhoneLookup.DISPLAY_NAME};
-        String contactName = null;
-        Cursor cursor = contentResolver.query(uri, projection, null, null, null);
-        if (cursor != null && cursor.moveToFirst()) {
-            int nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME);
-            contactName = cursor.getString(nameIndex);
-            cursor.close();
-        }
-        return contactName;
-    }
-
     @Override
     public void onReceive(Context context, Intent intent) {
-        this.context = context;
-
-        Bundle bundle = intent.getExtras();
-        if (bundle == null) {
+        if (intent.getExtras() == null || intent.getAction() == null) {
             return;
         }
+
+        this.context = context;
+        WebhookMessage message = null;
+
+        ArrayList<ForwardingConfig> configs = ForwardingConfig.getAll(context);
+        String asterisk = context.getString(R.string.asterisk);
+
+        switch (intent.getAction()) {
+            case "android.provider.Telephony.SMS_RECEIVED":
+                message = onReceiveSmsReceived(context, intent);
+                break;
+            case "android.intent.action.PHONE_STATE":
+                message = onReceivePhoneStateChange(context, intent);
+                break;
+        }
+
+        // determine if we should call any webhooks
+        if (message == null) return;
+        for (ForwardingConfig config : configs) {
+            // check sender phone number
+            // TODO should this be allowed to be null? eg. Unknown number calling
+            // if the sender is null or not the config's chosen sender AND the config isn't set to "*"
+            // kinda silly to check config.getSender() twice
+            // TODO senderPhoneNumber MUST BE A STRING!!!
+            // CONTINUE FROM HERE!
+
+            if ((message.senderPhoneNumber == null || !message.senderPhoneNumber.equals(config.getSender())) && !config.getSender().equals(asterisk)) {
+                continue;
+            }
+
+            // check SMS enabled
+            // TODO add extra modes for calls/SMS
+            if (!config.getIsSmsEnabled()) {
+                continue;
+            }
+
+            // check SIM slot
+            if (config.getSimSlot() > 0 && config.getSimSlot() != message.simSlotId) {
+                continue;
+            }
+
+            // call webhook if all above criteria met
+            this.callWebHook(config, message);
+        }
+    }
+
+    public WebhookMessage onReceivePhoneStateChange(Context context, Intent intent) {
+        Bundle bundle = intent.getExtras();
+
+        // TODO reference locale instead
+        String messageSource = "Incoming Call";
+
+
+        // get caller number
+        // When the phone is ringing, read the incoming number
+        String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+        if (state == null || !state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
+            return null;
+        }
+
+        String callerPhoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+
+        // exit if we can't see the phone number,
+        // since we assume multiple pings with a single state change and only want a single notification
+        // TODO investigate further for things like Unknown callers!
+        if (callerPhoneNumber == null || callerPhoneNumber.isEmpty()) {
+            return null;
+        }
+
+        // get caller's contact name if applicable
+        String senderName = getContactNameByPhoneNumber(callerPhoneNumber, context);
+
+        // get SIM slot info
+        int slotId = this.detectSim(bundle) + 1;
+        String slotName = "undetected";
+        if (slotId < 0) {
+            slotId = 0;
+        }
+
+        if (slotId > 0) {
+            slotName = "sim" + slotId;
+        }
+
+        return new WebhookMessage(messageSource, callerPhoneNumber, senderName, slotId, slotName, "",  System.currentTimeMillis());
+    }
+
+    public WebhookMessage onReceiveSmsReceived(Context context, Intent intent) {
+
+        // construct SMS message
+        Bundle bundle = intent.getExtras();
+
+        // TODO reference locale instead
+        String messageSource = "Incoming SMS";
 
         Object[] pdus = (Object[]) bundle.get("pdus");
         if (pdus == null || pdus.length == 0) {
-            return;
+            return null;
         }
 
         StringBuilder content = new StringBuilder();
@@ -63,61 +142,32 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             content.append(messages[i].getDisplayMessageBody());
         }
 
-        ArrayList<ForwardingConfig> configs = ForwardingConfig.getAll(context);
-        String asterisk = context.getString(R.string.asterisk);
-
+        // get sending phone number
         String senderPhoneNumber = messages[0].getOriginatingAddress();
         if (senderPhoneNumber == null) {
-            return;
+            return null;
         }
 
         // get sender's contact name if applicable
-        String senderName = null;
-        // Attempt to resolve sender name if `READ_CONTACTS` permission has been granted
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                senderName = getContactNameByPhoneNumber(senderPhoneNumber, context);
-            }
-            catch (java.lang.SecurityException se) {
-                // READ_CONTACTS hasn't been granted, but we shouldn't've gotten here...
-                assert true;
-            }
-        }
-        if (senderName == null) {
-            senderName = senderPhoneNumber;     // fallback to phone number
+        String senderName = getContactNameByPhoneNumber(senderPhoneNumber, context);
+
+        // get SIM slot info
+        int slotId = this.detectSim(bundle) + 1;
+        String slotName = "undetected";
+        if (slotId < 0) {
+            slotId = 0;
         }
 
-        for (ForwardingConfig config : configs) {
-            if (!senderPhoneNumber.equals(config.getSender()) && !config.getSender().equals(asterisk)) {
-                continue;
-            }
-
-            if (!config.getIsSmsEnabled()) {
-                continue;
-            }
-
-            int slotId = this.detectSim(bundle) + 1;
-            String slotName = "undetected";
-            if (slotId < 0) {
-                slotId = 0;
-            }
-
-            if (config.getSimSlot() > 0 && config.getSimSlot() != slotId) {
-                continue;
-            }
-
-            if (slotId > 0) {
+        if (slotId > 0) {
                 slotName = "sim" + slotId;
             }
 
-            this.callWebHook(config, senderPhoneNumber, senderName, slotName, content.toString(), messages[0].getTimestampMillis());
-        }
+        return new WebhookMessage(messageSource, senderPhoneNumber, senderName, slotId, slotName, content.toString(), messages[0].getTimestampMillis());
     }
 
-    protected void callWebHook(ForwardingConfig config, String senderPhoneNumber, String senderName, String slotName,
-                               String content, long timeStamp) {
+    public void callWebHook(ForwardingConfig config,WebhookMessage message) {
 
-        String message = config.prepareMessage(senderPhoneNumber, senderName, content, slotName, timeStamp);
+        String strMessage = config.prepareMessage(message);
 
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -125,7 +175,7 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
 
         Data data = new Data.Builder()
                 .putString(RequestWorker.DATA_URL, config.getUrl())
-                .putString(RequestWorker.DATA_TEXT, message)
+                .putString(RequestWorker.DATA_TEXT, strMessage)
                 .putString(RequestWorker.DATA_HEADERS, config.getHeaders())
                 .putBoolean(RequestWorker.DATA_IGNORE_SSL, config.getIgnoreSsl())
                 .putBoolean(RequestWorker.DATA_CHUNKED_MODE, config.getChunkedMode())
@@ -196,5 +246,32 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
         }
 
         return slotId;
+    }
+
+    private static String getContactNameByPhoneNumber(String phoneNumber, Context context) {
+
+        // Attempt to resolve sender name if `READ_CONTACTS` permission has been granted
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                ContentResolver contentResolver = context.getContentResolver();
+                Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
+                String[] projection = {ContactsContract.PhoneLookup.DISPLAY_NAME};
+                String contactName = null;
+                Cursor cursor = contentResolver.query(uri, projection, null, null, null);
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME);
+                    contactName = cursor.getString(nameIndex);
+                    cursor.close();
+                }
+
+                if (contactName != null) return contactName;
+            }
+            catch (java.lang.SecurityException se) {
+                // READ_CONTACTS hasn't been granted, but we shouldn't've gotten here...
+                assert true;
+            }
+        }
+
+        return phoneNumber;
     }
 }

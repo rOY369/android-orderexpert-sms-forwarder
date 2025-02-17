@@ -31,6 +31,7 @@ Sample payload:
 {
      "from": "%from%",
      "fromName": "%fromName%",
+     "messageType": "%messageType%",
      "text": "%text%",
      "sentStamp": "%sentStamp%",
      "receivedStamp": "%receivedStamp%",

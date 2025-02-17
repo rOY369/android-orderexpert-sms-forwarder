@@ -123,7 +123,7 @@ public class ForwardingConfig {
     }
 
     public static String getDefaultJsonTemplate() {
-        return "{\n  \"from\":\"%fromName%\",\n  \"text\":\"%text%\",\n  \"sentStamp\":%sentStamp%,\n  \"receivedStamp\":%receivedStamp%,\n  \"sim\":\"%sim%\"\n}";
+        return "{\n  \"messageType\":\"%messageType%\",\n \"from\":\"%fromName%\",\n  \"text\":\"%text%\",\n  \"sentStamp\":%sentStamp%,\n  \"receivedStamp\":%receivedStamp%,\n  \"sim\":\"%sim%\"\n}";
     }
 
     public static String getDefaultJsonHeaders() {
@@ -235,15 +235,16 @@ public class ForwardingConfig {
         editor.commit();
     }
 
-    public String prepareMessage(String from, String fromName, String content, String sim, long timeStamp) {
+    public String prepareMessage(WebhookMessage message) {
         return this.getTemplate()
-                .replaceAll("%from%", from)
-                .replaceAll("%fromName%", fromName)
-                .replaceAll("%sentStamp%", String.valueOf(timeStamp))
+                .replaceAll("%messageType%", message.messageType)
+                .replaceAll("%from%", message.senderPhoneNumber)
+                .replaceAll("%fromName%", message.senderName)
+                .replaceAll("%sentStamp%", String.valueOf(message.timestamp))
                 .replaceAll("%receivedStamp%", String.valueOf(System.currentTimeMillis()))
-                .replaceAll("%sim%", sim)
+                .replaceAll("%sim%", message.simSlotName)
                 .replaceAll("%text%",
-                        Matcher.quoteReplacement(StringEscapeUtils.escapeJson(content)));
+                        Matcher.quoteReplacement(StringEscapeUtils.escapeJson(message.messageContent)));
     }
 
     private static SharedPreferences getPreference(Context context) {
