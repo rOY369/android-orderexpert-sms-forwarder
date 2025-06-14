@@ -243,6 +243,7 @@ public class ForwardingConfig {
                 .replaceAll("%sentStamp%", String.valueOf(message.timestamp))
                 .replaceAll("%receivedStamp%", String.valueOf(System.currentTimeMillis()))
                 .replaceAll("%sim%", message.simSlotName)
+                .replaceAll("%in-sim%", message.simNumber == null ? "" : message.simNumber)
                 .replaceAll("%text%",
                         Matcher.quoteReplacement(StringEscapeUtils.escapeJson(message.messageContent)));
     }

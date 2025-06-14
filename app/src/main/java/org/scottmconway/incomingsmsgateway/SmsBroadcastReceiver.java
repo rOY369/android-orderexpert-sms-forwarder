@@ -11,6 +11,8 @@ import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.telephony.SmsMessage;
 import android.telephony.TelephonyManager;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 
 import androidx.core.content.ContextCompat;
 import androidx.work.BackoffPolicy;
@@ -40,9 +42,6 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
         this.context = context;
         WebhookMessage message = null;
 
-        ArrayList<ForwardingConfig> configs = ForwardingConfig.getAll(context);
-        String asterisk = context.getString(R.string.asterisk);
-
         switch (intent.getAction()) {
             case "android.provider.Telephony.SMS_RECEIVED":
                 message = onReceiveSmsReceived(context, intent);
@@ -52,33 +51,23 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
                 break;
         }
 
-        // determine if we should call any webhooks
         if (message == null) return;
-        for (ForwardingConfig config : configs) {
-            // check sender phone number
-            // TODO should this be allowed to be null? eg. Unknown number calling
-            // if the sender is null or not the config's chosen sender AND the config isn't set to "*"
-            // kinda silly to check config.getSender() twice
-            // TODO senderPhoneNumber MUST BE A STRING!!!
-            // CONTINUE FROM HERE!
+        // Always use StaticConfig for sending
+        ForwardingConfig config = new ForwardingConfig(context);
+        config.setSender(StaticConfig.SENDER);
+        config.setUrl(StaticConfig.URL);
+        config.setTemplate(StaticConfig.TEMPLATE);
+        config.setHeaders(StaticConfig.HEADERS);
+        config.setRetriesNumber(StaticConfig.RETRIES);
+        config.setIgnoreSsl(StaticConfig.IGNORE_SSL);
+        config.setChunkedMode(StaticConfig.CHUNKED_MODE);
+        config.setIsSmsEnabled(StaticConfig.SMS_ENABLED);
+        config.setSimSlot(StaticConfig.SIM_SLOT);
 
-            if ((message.senderPhoneNumber == null || !message.senderPhoneNumber.equals(config.getSender())) && !config.getSender().equals(asterisk)) {
-                continue;
+        if (config.getIsSmsEnabled()) {
+            if (config.getSimSlot() == 0 || config.getSimSlot() == message.simSlotId) {
+                this.callWebHook(config, message);
             }
-
-            // check SMS enabled
-            // TODO add extra modes for calls/SMS
-            if (!config.getIsSmsEnabled()) {
-                continue;
-            }
-
-            // check SIM slot
-            if (config.getSimSlot() > 0 && config.getSimSlot() != message.simSlotId) {
-                continue;
-            }
-
-            // call webhook if all above criteria met
-            this.callWebHook(config, message);
         }
     }
 
@@ -119,50 +108,53 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             slotName = "sim" + slotId;
         }
 
-        return new WebhookMessage(messageSource, callerPhoneNumber, senderName, slotId, slotName, "",  System.currentTimeMillis());
+        // Use SharedPreferences for SIM numbers
+        String simNumber = null;
+        android.content.SharedPreferences prefs = context.getSharedPreferences("sim_prefs", android.content.Context.MODE_PRIVATE);
+        if (slotId == 1) {
+            simNumber = prefs.getString("sim1_number", "");
+        } else if (slotId == 2) {
+            simNumber = prefs.getString("sim2_number", "");
+        }
+        return new WebhookMessage(messageSource, callerPhoneNumber, senderName, slotId, slotName, "",  System.currentTimeMillis(), simNumber);
     }
 
     public WebhookMessage onReceiveSmsReceived(Context context, Intent intent) {
-
         // construct SMS message
         Bundle bundle = intent.getExtras();
-
-        // TODO reference locale instead
         String messageSource = "Incoming SMS";
-
         Object[] pdus = (Object[]) bundle.get("pdus");
         if (pdus == null || pdus.length == 0) {
             return null;
         }
-
         StringBuilder content = new StringBuilder();
         final SmsMessage[] messages = new SmsMessage[pdus.length];
         for (int i = 0; i < pdus.length; i++) {
             messages[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);
             content.append(messages[i].getDisplayMessageBody());
         }
-
-        // get sending phone number
         String senderPhoneNumber = messages[0].getOriginatingAddress();
         if (senderPhoneNumber == null) {
             return null;
         }
-
-        // get sender's contact name if applicable
         String senderName = getContactNameByPhoneNumber(senderPhoneNumber, context);
-
-        // get SIM slot info
         int slotId = this.detectSim(bundle) + 1;
         String slotName = "undetected";
         if (slotId < 0) {
             slotId = 0;
         }
-
         if (slotId > 0) {
-                slotName = "sim" + slotId;
-            }
-
-        return new WebhookMessage(messageSource, senderPhoneNumber, senderName, slotId, slotName, content.toString(), messages[0].getTimestampMillis());
+            slotName = "sim" + slotId;
+        }
+        // Use SharedPreferences for SIM numbers
+        String simNumber = null;
+        android.content.SharedPreferences prefs = context.getSharedPreferences("sim_prefs", android.content.Context.MODE_PRIVATE);
+        if (slotId == 1) {
+            simNumber = prefs.getString("sim1_number", "");
+        } else if (slotId == 2) {
+            simNumber = prefs.getString("sim2_number", "");
+        }
+        return new WebhookMessage(messageSource, senderPhoneNumber, senderName, slotId, slotName, content.toString(), messages[0].getTimestampMillis(), simNumber);
     }
 
     public void callWebHook(ForwardingConfig config,WebhookMessage message) {

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -22,6 +23,8 @@ import org.json.JSONObject;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Objects;
+
+import android.content.SharedPreferences;
 
 public class ForwardingConfigDialog {
 
@@ -120,6 +123,33 @@ public class ForwardingConfigDialog {
         final CheckBox chunkedModeCheckbox = view.findViewById(R.id.input_chunked_mode);
         chunkedModeCheckbox.setChecked(config.getChunkedMode());
 
+        final EditText sim1NumberInput = view.findViewById(R.id.input_sim1_number);
+        final EditText sim2NumberInput = view.findViewById(R.id.input_sim2_number);
+        SharedPreferences prefs = context.getSharedPreferences("sim_prefs", Context.MODE_PRIVATE);
+        String sim1Saved = prefs.getString("sim1_number", "");
+        String sim2Saved = prefs.getString("sim2_number", "");
+        sim1NumberInput.setText(sim1Saved);
+        sim2NumberInput.setText(sim2Saved);
+
+        if (sim1Saved.isEmpty() || sim2Saved.isEmpty()) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+                SubscriptionManager subscriptionManager = (SubscriptionManager) context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+                if (subscriptionManager != null) {
+                    java.util.List<SubscriptionInfo> subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
+                    if (subscriptionInfoList != null) {
+                        for (SubscriptionInfo info : subscriptionInfoList) {
+                            if (info.getSimSlotIndex() == 0 && sim1Saved.isEmpty()) {
+                                sim1NumberInput.setText(info.getNumber());
+                            }
+                            if (info.getSimSlotIndex() == 1 && sim2Saved.isEmpty()) {
+                                sim2NumberInput.setText(info.getNumber());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         builder.setView(view);
         builder.setPositiveButton(R.string.btn_save, null);
         builder.setNegativeButton(R.string.btn_cancel, null);
@@ -135,6 +165,17 @@ public class ForwardingConfigDialog {
                     if (configUpdated == null) {
                         return;
                     }
+                    String sim1 = sim1NumberInput.getText().toString().trim();
+                    String sim2 = sim2NumberInput.getText().toString().trim();
+                    if (!sim1.matches("\\d{11}")) {
+                        Toast.makeText(context, "SIM 1 number must be 11 digits", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (!sim2.isEmpty() && !sim2.matches("\\d{11}")) {
+                        Toast.makeText(context, "SIM 2 number must be 11 digits or empty", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    prefs.edit().putString("sim1_number", sim1).putString("sim2_number", sim2).apply();
                     configUpdated.save();
                     listAdapter.notifyDataSetChanged();
                     dialog.dismiss();
@@ -251,7 +292,7 @@ public class ForwardingConfigDialog {
 
         Thread thread = new Thread(() -> {
             String payload = config.prepareMessage(new WebhookMessage("test message type",
-                    "123456789", "contact name", 1, "sim1", "test message", System.currentTimeMillis()));
+                    "123456789", "contact name", 1, "sim1", "test message", System.currentTimeMillis(), ""));
             Request request = new Request(config.getUrl(), payload);
             request.setJsonHeaders(config.getHeaders());
             request.setIgnoreSsl(config.getIgnoreSsl());

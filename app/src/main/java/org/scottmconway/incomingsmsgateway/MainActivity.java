@@ -1,39 +1,23 @@
 package org.scottmconway.incomingsmsgateway;
 
 import android.Manifest;
-import android.app.ActivityManager;
-import android.app.AlertDialog;
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.WindowManager;
-import android.widget.ListView;
 import android.widget.TextView;
+import android.app.AlertDialog;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.content.SharedPreferences;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Objects;
+import android.content.pm.PackageManager;
 
 public class MainActivity extends AppCompatActivity {
-
-    private Context context;
-    private ListAdapter listAdapter;
-
     private static final int PERMISSION_CODE = 0;
 
     @Override
@@ -42,8 +26,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-            // we can run with any subset of these permissions,
-            // but functionality will be limited
             ActivityCompat.requestPermissions(this, new String[]{
                     Manifest.permission.RECEIVE_SMS,
                     Manifest.permission.READ_CONTACTS,
@@ -51,8 +33,11 @@ public class MainActivity extends AppCompatActivity {
                     Manifest.permission.READ_CALL_LOG
             }, PERMISSION_CODE);
         } else {
-            showList();
+            showConfig();
         }
+
+        Button btnEditSimNumbers = findViewById(R.id.btn_edit_sim_numbers);
+        btnEditSimNumbers.setOnClickListener(v -> showEditSimNumbersDialog());
     }
 
     @Override
@@ -64,116 +49,17 @@ public class MainActivity extends AppCompatActivity {
             if (!permissions[i].equals(Manifest.permission.RECEIVE_SMS)) {
                 continue;
             }
-
-            if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
-                showList();
+            if (grantResults[i] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                showConfig();
             } else {
                 showInfo(getResources().getString(R.string.permission_needed));
             }
-
             return;
         }
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.action_bar_menu, menu);
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.action_bar_syslogs) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            View view = getLayoutInflater().inflate(R.layout.syslogs, null);
-
-            String logs = "";
-            try {
-                String[] command = new String[]{
-                        "logcat", "-d", "*:E", "-m", "1000",
-                        "|", "grep", "org.scottmconway.incomingsmsgateway"};
-                Process process = Runtime.getRuntime().exec(command);
-
-                BufferedReader bufferedReader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()));
-
-                String line;
-                while ((line = bufferedReader.readLine()) != null) {
-                    logs += line + "\n";
-                }
-            } catch (IOException ex) {
-                logs = "getLog failed";
-            }
-
-            TextView logsTextContainer = view.findViewById(R.id.syslogs_text);
-            logsTextContainer.setText(logs);
-
-            TextView version = view.findViewById(R.id.syslogs_version);
-            // version.setText("v" + BuildConfig.VERSION_NAME);
-
-            builder.setView(view);
-            builder.setNegativeButton(R.string.btn_close, null);
-            builder.setNeutralButton(R.string.btn_clear, null);
-
-            final AlertDialog dialog = builder.show();
-            Objects.requireNonNull(dialog.getWindow())
-                    .setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-                    .setOnClickListener(view1 -> {
-                        String[] command = new String[]{"logcat", "-c"};
-                        try {
-                            Runtime.getRuntime().exec(command);
-                        } catch (IOException e) {
-                            Log.e("SmsGateway", "log clear error: " + e);
-                        }
-                        dialog.cancel();
-                    });
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    private void showList() {
-        showInfo("");
-
-        context = this;
-        ListView listview = findViewById(R.id.listView);
-
-        ArrayList<ForwardingConfig> configs = ForwardingConfig.getAll(context);
-
-        listAdapter = new ListAdapter(configs, context);
-        listview.setAdapter(listAdapter);
-
-        FloatingActionButton fab = findViewById(R.id.btn_add);
-        fab.setOnClickListener(this.showAddDialog());
-
-        if (!this.isServiceRunning()) {
-            this.startService();
-        }
-    }
-
-    private boolean isServiceRunning() {
-        ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-            if (org.scottmconway.incomingsmsgateway.SmsReceiverService.class.getName().equals(service.service.getClassName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void startService() {
-        Context appContext = getApplicationContext();
-        Intent intent = new Intent(this, SmsReceiverService.class);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            appContext.startForegroundService(intent);
-        } else {
-            appContext.startService(intent);
-        }
+    private void showConfig() {
+        // Do not show the dialog automatically. The main screen will show the message.
     }
 
     private void showInfo(String text) {
@@ -181,9 +67,35 @@ public class MainActivity extends AppCompatActivity {
         notice.setText(text);
     }
 
-    private View.OnClickListener showAddDialog() {
-        return v -> {
-            (new ForwardingConfigDialog(context, getLayoutInflater(), listAdapter)).showNew();
-        };
+    private void showEditSimNumbersDialog() {
+        LayoutInflater inflater = LayoutInflater.from(this);
+        View dialogView = inflater.inflate(R.layout.dialog_edit_sim_numbers, null);
+        EditText sim1Input = dialogView.findViewById(R.id.input_sim1_number);
+        EditText sim2Input = dialogView.findViewById(R.id.input_sim2_number);
+        SharedPreferences prefs = getSharedPreferences("sim_prefs", MODE_PRIVATE);
+        String sim1Saved = prefs.getString("sim1_number", "");
+        String sim2Saved = prefs.getString("sim2_number", "");
+        android.util.Log.d("MainActivity", "Loaded SIM1: " + sim1Saved + ", SIM2: " + sim2Saved);
+        sim1Input.setText(sim1Saved);
+        sim2Input.setText(sim2Saved);
+        new AlertDialog.Builder(this)
+            .setTitle("Edit SIM Numbers")
+            .setView(dialogView)
+            .setPositiveButton("Save", (dialog, which) -> {
+                String sim1 = sim1Input.getText().toString().trim();
+                String sim2 = sim2Input.getText().toString().trim();
+                if (!sim1.matches("\\d{10}")) {
+                    Toast.makeText(this, "SIM 1 number must be 10 digits", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!sim2.isEmpty() && !sim2.matches("\\d{10}")) {
+                    Toast.makeText(this, "SIM 2 number must be 10 digits or empty", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.edit().putString("sim1_number", sim1).putString("sim2_number", sim2).apply();
+                Toast.makeText(this, "SIM numbers saved", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 }

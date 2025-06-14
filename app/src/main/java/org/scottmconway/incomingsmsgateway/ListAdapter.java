@@ -51,9 +51,6 @@ public class ListAdapter extends ArrayAdapter<ForwardingConfig> {
         TextView template = row.findViewById(R.id.text_template);
         template.setText(config.getTemplate());
 
-        TextView headers = row.findViewById(R.id.text_headers);
-        headers.setText(config.getHeaders());
-
         SwitchCompat switchSmsOnOff = row.findViewById(R.id.switch_sms_on_off);
         TextView switchSmsLabel = row.findViewById(R.id.text_sms_on_off);
         if (config.getIsSmsEnabled()) {
@@ -75,13 +72,12 @@ public class ListAdapter extends ArrayAdapter<ForwardingConfig> {
             config.save();
         });
 
+        // Disable edit and delete buttons
         View editButton = row.findViewById(R.id.edit_button);
-        editButton.setTag(R.id.edit_button, position);
-        editButton.setOnClickListener(this::onEditClick);
+        editButton.setVisibility(View.GONE);
 
         View deleteButton = row.findViewById(R.id.delete_button);
-        deleteButton.setTag(R.id.delete_button, position);
-        deleteButton.setOnClickListener(this::onDeleteClick);
+        deleteButton.setVisibility(View.GONE);
 
         return row;
     }

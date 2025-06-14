@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sender Filter"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_sender"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Webhook URL"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_url"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Message Template"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_template"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:id="@+id/headers_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Headers"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_headers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Retry Count"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_retries"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ignore SSL"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_ignore_ssl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Chunked Mode"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_chunked_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@android:color/transparent"
+            android:inputType="none"
+            android:focusable="false" />
+
+    </LinearLayout>
+</ScrollView> 

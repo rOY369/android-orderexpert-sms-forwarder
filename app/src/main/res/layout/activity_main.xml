@@ -14,7 +14,8 @@
         android:gravity="center_horizontal"
         android:layout_gravity="center_vertical"
         android:id="@+id/info_notice"
-        />
+        android:text="Service is running in the background."
+        android:textSize="18sp" />
 
     <ListView
         android:id="@+id/listView"
@@ -28,5 +29,13 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="@dimen/fab_margin"
         android:src="@drawable/ic_btn_add" />
+
+    <Button
+        android:id="@+id/btn_edit_sim_numbers"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Edit SIM Numbers"
+        android:layout_marginTop="24dp"
+        android:layout_gravity="center_horizontal"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
